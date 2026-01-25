@@ -16,7 +16,7 @@ import time
 CURRENT_VERSION = "1.0.0"
 GITHUB_USER = "hikikomori1870-bit"
 GITHUB_REPO = "clean-truyen-hehe"
-VERSION_URL = f"https://raw.githubusercontent.com/hikikomori1870-bit/clean-truyen-hehe/main/version.json"
+VERSION_URL = f"https://raw.githubusercontent.com/{GITHUB_USER}/{GITHUB_REPO}/main/version.json"
 def check_for_updates():
     print(f"\n🔍 Đang kiểm tra bản cập nhật... (Phiên bản hiện tại: {CURRENT_VERSION})")
     try:
@@ -834,4 +834,5 @@ if __name__ == "__main__":
             log_error("SYSTEM", f"Critical System Error: {e}")
             traceback.print_exc()
             input("\nNhấn Enter để tiếp tục...")                      
+
         if input("\nTiếp tục xử lý đợt khác? (y/n): ").lower() == 'n': break
