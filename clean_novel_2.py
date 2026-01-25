@@ -12,11 +12,13 @@ import urllib.request
 import json
 import subprocess
 import time
+import concurrent.futures
 
 CURRENT_VERSION = "1.0.0"
 GITHUB_USER = "hikikomori1870-bit"
 GITHUB_REPO = "clean-truyen-hehe"
 VERSION_URL = f"https://raw.githubusercontent.com/{GITHUB_USER}/{GITHUB_REPO}/main/version.json"
+
 def check_for_updates():
     print(f"\n🔍 Đang kiểm tra bản cập nhật... (Phiên bản hiện tại: {CURRENT_VERSION})")
     try:
@@ -58,6 +60,7 @@ del "%~f0"
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', line_buffering=True)
 INDENT_STYLE = "\u3000\u3000" 
 REPLACEMENT_CONFIG_FILE = "replacements.txt"
+GARBAGE_CONFIG_FILE = "garbage.txt" 
 def fast_print(*args, **kwargs):
     kwargs['flush'] = True
     print(*args, **kwargs)
@@ -67,13 +70,30 @@ def log_error(file_name, message):
         with open("processing_errors.log", "a", encoding="utf-8") as f:
             f.write(f"[{timestamp}] {file_name}: {message}\n")
     except: pass
-def clean_garbage_text(text):
-    garbage_patterns = [
+def load_garbage_patterns():
+    patterns = [
         r'https?://\S+', r'www\.\S+', r'\w+\.com', r'\w+\.net',
         r'Sưu tầm bởi.*?', r'Chúc bạn đọc truyện vui vẻ'
     ]
-    for pattern in garbage_patterns:
-        text = re.sub(pattern, '', text, flags=re.IGNORECASE)
+    if os.path.exists(GARBAGE_CONFIG_FILE):
+        try:
+            with open(GARBAGE_CONFIG_FILE, 'r', encoding='utf-8-sig') as f:
+                for line in f:
+                    if line.strip(): patterns.append(line.strip())
+        except: pass
+    return patterns
+def clean_garbage_text(text, patterns=None):
+    if patterns is None:
+        patterns = load_garbage_patterns()
+    for pattern in patterns:
+        try:
+            text = re.sub(pattern, '', text, flags=re.IGNORECASE)
+        except: pass
+    return text
+def normalize_punctuation(text):
+    text = re.sub(r'\s+([,.:;?!])', r'\1', text)
+    text = re.sub(r'([,.:;?!])(?=[^\s\d])', r'\1 ', text)
+    text = re.sub(r' +', ' ', text)
     return text
 def load_replacements():
     replace_dict = {}
@@ -120,12 +140,8 @@ def sanitize_filename(name):
     clean = re.sub(r'[\\/*?:"<>|]', "", name).strip()
     return clean[:100]
 def clean_common_entities(text):
+    text = html.unescape(text)
     text = text.replace("&nbsp;", " ")
-    text = text.replace("&quot;", '"')
-    text = text.replace("&amp;", "&")
-    text = text.replace("&lt;", "<")
-    text = text.replace("&gt;", ">")
-    text = text.replace("&#39;", "'")
     return text
 def apply_replacements(text, replace_dict):
     for old, new in replace_dict.items():
@@ -251,7 +267,7 @@ def verify_and_report_final(output_dir, chapters_with_notes):
         file_name_no_ext = os.path.splitext(f)[0]
         has_note = "[v]" if file_name_no_ext in safe_notes else ""
         print(f"{idx+1:<5} {size:<12} {has_note:<6} {f}")
-def create_epub_file(output_path, book_title, chapters, author="Unknown"):
+def create_epub_file(output_path, book_title, chapters, author="Unknown", cover_path=None):
     """Tạo file EPUB từ danh sách chương mà không cần thư viện ngoài"""
     print(f"📚 Đang đóng gói EPUB: {output_path} ...")    
     try:
@@ -269,9 +285,26 @@ def create_epub_file(output_path, book_title, chapters, author="Unknown"):
             nav_points = []            
             css_content = '''body { font-family: "Times New Roman", serif; line-height: 1.5; margin: 5%; }
 h2 { text-align: center; color: #333; page-break-after: avoid; }
-p { text-indent: 2em; margin-bottom: 0.5em; text-align: justify; }'''
+p { text-indent: 2em; margin-bottom: 0.5em; text-align: justify; }
+.cover { text-align: center; height: 100%; }
+.cover img { max-width: 100%; max-height: 100%; }'''
             z.writestr("OEBPS/style.css", css_content)
             manifest_items.append('<item id="style" href="style.css" media-type="text/css"/>')
+            cover_meta = ""
+            if cover_path and os.path.exists(cover_path):
+                ext = os.path.splitext(cover_path)[1].lower().replace('.', '')
+                media_type = "image/jpeg" if ext in ['jpg', 'jpeg'] else "image/png"
+                z.write(cover_path, f"OEBPS/cover.{ext}")
+                manifest_items.append(f'<item id="cover-image" href="cover.{ext}" media-type="{media_type}"/>')
+                cover_meta = '<meta name="cover" content="cover-image"/>'
+                cover_html = f'''<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head><title>Cover</title><link href="style.css" rel="stylesheet" type="text/css"/></head>
+<body><div class="cover"><img src="cover.{ext}" alt="Cover"/></div></body></html>'''
+                z.writestr("OEBPS/cover.html", cover_html)
+                manifest_items.append('<item id="cover-page" href="cover.html" media-type="application/xhtml+xml"/>')
+                spine_refs.append('<itemref idref="cover-page"/>')
             for idx, (title, lines) in enumerate(chapters):
                 file_name = f"chapter_{idx+1}.html"
                 html_body = []
@@ -287,12 +320,11 @@ p { text-indent: 2em; margin-bottom: 0.5em; text-align: justify; }'''
 <body>
 {"".join(html_body)}
 </body></html>'''                
-                z.writestr(f"OEBPS/{file_name}", html_content)
-                
+                z.writestr(f"OEBPS/{file_name}", html_content)               
                 item_id = f"chap{idx+1}"
                 manifest_items.append(f'<item id="{item_id}" href="{file_name}" media-type="application/xhtml+xml"/>')
                 spine_refs.append(f'<itemref idref="{item_id}"/>')
-                nav_points.append(f'<navPoint id="nav{idx+1}" playOrder="{idx+1}"><navLabel><text>{html.escape(title)}</text></navLabel><content src="{file_name}"/></navPoint>')
+                nav_points.append(f'<navPoint id="nav{idx+1}" playOrder="{idx+1}"><navLabel><text>{html.escape(title)}</text></navLabel><content src="{file_name}"/></navPoint>')            
             opf_content = f'''<?xml version="1.0" encoding="UTF-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" unique-identifier="BookID" version="2.0">
     <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
@@ -300,6 +332,7 @@ p { text-indent: 2em; margin-bottom: 0.5em; text-align: justify; }'''
         <dc:creator>{author}</dc:creator>
         <dc:language>vi</dc:language>
         <dc:identifier id="BookID" opf:scheme="UUID">{uuid.uuid4()}</dc:identifier>
+        {cover_meta}
     </metadata>
     <manifest>
         <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
@@ -333,6 +366,7 @@ def split_and_format_v6_reindex(input_file, start_chapter_num=1, signature_text=
     base_name = os.path.splitext(os.path.basename(input_file))[0]
     output_dir = ""    
     replacements = load_replacements()    
+    garbage_patterns = load_garbage_patterns() 
     if output_mode == "split":
         output_dir = os.path.join(os.path.dirname(input_file), f"{base_name}_Split")
         if not os.path.exists(output_dir): os.makedirs(output_dir)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            
@@ -343,15 +377,15 @@ def split_and_format_v6_reindex(input_file, start_chapter_num=1, signature_text=
     for enc in encodings:
         try:
             if file_size < limit:
-                print(f"📖 Đang nạp dữ liệu và xử lý thay thế từ điển...", end='', flush=True)
+                if not is_silent: print(f"📖 Đang nạp dữ liệu và xử lý thay thế từ điển...", end='', flush=True)
                 with open(input_file, 'r', encoding=enc) as f:
                     full_text = f.read()
                     full_text = clean_common_entities(full_text)
                     full_text = apply_replacements(full_text, replacements)
                     lines = full_text.splitlines()
-                print(" Hoàn tất!", flush=True)
+                if not is_silent: print(" Hoàn tất!", flush=True)
             else:
-                print(f"File lớn ({file_size/1024/1024:.1f}MB), dùng chế độ đọc từng dòng để tiết kiệm RAM...")
+                if not is_silent: print(f"File lớn ({file_size/1024/1024:.1f}MB), dùng chế độ đọc từng dòng để tiết kiệm RAM...")
                 with open(input_file, 'r', encoding=enc) as f:
                     for line in f:
                         l = clean_common_entities(line)
@@ -378,7 +412,7 @@ def split_and_format_v6_reindex(input_file, start_chapter_num=1, signature_text=
         mode = "PRIORITY_DASH_LONG"
     else:
         mode = "FALLBACK_KEYWORDS"           
-    print(f"[{base_name}] Thống kê: [=]: {eq_count} | [-]: {dash_long_count} -> MODE: {mode}")    
+    if not is_silent: print(f"[{base_name}] Thống kê: [=]: {eq_count} | [-]: {dash_long_count} -> MODE: {mode}")    
     chapters = []
     raw_titles_for_check = []
     current_title = "Phần mở đầu"
@@ -536,10 +570,13 @@ def split_and_format_v6_reindex(input_file, start_chapter_num=1, signature_text=
             current_lines = [raw_title]            
             temp_idx += 1
         else:
-            if line: current_lines.append(clean_garbage_text(line))
+            if line:
+                cleaned = clean_garbage_text(line, garbage_patterns)
+                cleaned = normalize_punctuation(cleaned)
+                current_lines.append(cleaned)
         i += 1           
     if current_lines: chapters.append((current_title, current_lines))   
-    check_sequence_gaps(raw_titles_for_check)    
+    if not is_silent: check_sequence_gaps(raw_titles_for_check)
     chapters = interactive_check_chapters(chapters, is_silent)                    
     final_processed_chapters = []
     current_idx = start_chapter_num    
@@ -630,7 +667,7 @@ def split_and_format_v6_reindex(input_file, start_chapter_num=1, signature_text=
         new_content[0] = new_title_str       
         if signature_text: new_content.append("\n" + signature_text)        
         final_processed_chapters.append((new_title_str, new_content))   
-    print(f"\n⚡ Đang xuất file dưới dạng: {output_mode.upper()}...")   
+    if not is_silent: print(f"\n⚡ Đang xuất file dưới dạng: {output_mode.upper()}...")   
     if output_mode == "split":
         count = 0
         for title, content in final_processed_chapters:
@@ -641,12 +678,13 @@ def split_and_format_v6_reindex(input_file, start_chapter_num=1, signature_text=
                 count += 1
             except Exception as e:
                 log_error(base_name, f"Lỗi ghi chương {title}: {e}")
-        print(f"\n" + " TỔNG KẾT DỮ LIỆU ".center(60, "="))
-        print(f"📊 Tổng số chương: {count}")
-        print(f"📝 Tổng ký tự nội dung: {total_chars:,}")
-        print(f"📂 Thư mục: {output_dir}")
-        print(f"💡 Chú thích: [v] = Chương có lời tác giả")
-        verify_and_report_final(output_dir, chapters_with_notes)            
+        if not is_silent:
+            print(f"\n" + " TỔNG KẾT DỮ LIỆU ".center(60, "="))
+            print(f"📊 Tổng số chương: {count}")
+            print(f"📝 Tổng ký tự nội dung: {total_chars:,}")
+            print(f"📂 Thư mục: {output_dir}")
+            print(f"💡 Chú thích: [v] = Chương có lời tác giả")
+            verify_and_report_final(output_dir, chapters_with_notes)            
     elif output_mode == "merge":
         out_file = os.path.join(os.path.dirname(input_file), f"{base_name}_cleaned.txt")
         try:
@@ -660,7 +698,16 @@ def split_and_format_v6_reindex(input_file, start_chapter_num=1, signature_text=
         epub_chapters = []
         for t, c in final_processed_chapters:
             epub_chapters.append((t, c[1:]))
-        create_epub_file(out_file, base_name, epub_chapters)
+        cover_path = None
+        input_dir = os.path.dirname(input_file)
+        possible_names = ["cover.jpg", "cover.png", f"{base_name}.jpg", f"{base_name}.png"]
+        for p in possible_names:
+            full_p = os.path.join(input_dir, p)
+            if os.path.exists(full_p):
+                cover_path = full_p
+                print(f"🖼️ Phát hiện ảnh bìa: {p}")
+                break       
+        create_epub_file(out_file, base_name, epub_chapters, cover_path=cover_path)
 if __name__ == "__main__":
     check_for_updates()
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -668,6 +715,9 @@ if __name__ == "__main__":
     if not os.path.exists(REPLACEMENT_CONFIG_FILE):
         with open(REPLACEMENT_CONFIG_FILE, 'w', encoding='utf-8-sig') as f:
             f.write("vietnam=Việt Nam\nkhựa=Trung Quốc\n")
+    if not os.path.exists(GARBAGE_CONFIG_FILE):
+        with open(GARBAGE_CONFIG_FILE, 'w', encoding='utf-8-sig') as f:
+             f.write("https://.*\nwww\\..*\n")
     def load_signature():
         if os.path.exists(CONFIG_FILE):
             try:
@@ -812,27 +862,47 @@ if __name__ == "__main__":
             if cancel_process:
                 continue
             print(f"\n🚀 BẮT ĐẦU XỬ LÝ {len(target_files)} FILE...\n")
-            for idx, fpath in enumerate(target_files):
-                print(f"⏳ [{idx+1}/{len(target_files)}] Processing: {os.path.basename(fpath)}...")
-                try:
-                    split_and_format_v6_reindex(
-                        input_file=fpath,
-                        start_chapter_num=start_num,
-                        signature_text=sig,
-                        output_mode=output_mode,
-                        is_silent=is_silent,
-                        indent_str=indent_str,
-                        keep_original_numbering=keep_original
-                    ) 
-                except Exception as e:
-                    print(f"❌ Lỗi file {fpath}: {e}")
-                    log_error(os.path.basename(fpath), f"Critical Error: {e}")
-                    traceback.print_exc()            
+            if is_silent and len(target_files) > 1:
+                print(f"⚡ Đang chạy chế độ ĐA LUỒNG (Max 4 tiến trình)...")
+                with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+                    futures = []
+                    for fpath in target_files:
+                        futures.append(executor.submit(
+                            split_and_format_v6_reindex,
+                            input_file=fpath,
+                            start_chapter_num=start_num,
+                            signature_text=sig,
+                            output_mode=output_mode,
+                            is_silent=True,
+                            indent_str=indent_str,
+                            keep_original_numbering=keep_original
+                        ))
+                    for future in concurrent.futures.as_completed(futures):
+                        try:
+                            future.result()
+                        except Exception as e:
+                            print(f"❌ Có lỗi trong thread: {e}")
+            else:
+                for idx, fpath in enumerate(target_files):
+                    print(f"⏳ [{idx+1}/{len(target_files)}] Processing: {os.path.basename(fpath)}...")
+                    try:
+                        split_and_format_v6_reindex(
+                            input_file=fpath,
+                            start_chapter_num=start_num,
+                            signature_text=sig,
+                            output_mode=output_mode,
+                            is_silent=is_silent,
+                            indent_str=indent_str,
+                            keep_original_numbering=keep_original
+                        ) 
+                    except Exception as e:
+                        print(f"❌ Lỗi file {fpath}: {e}")
+                        log_error(os.path.basename(fpath), f"Critical Error: {e}")
+                        traceback.print_exc()            
             print("\n✅ HOÀN TẤT TẤT CẢ TÁC VỤ.")            
         except Exception as e: 
             print(f"❌ Lỗi Critical: {e}")
             log_error("SYSTEM", f"Critical System Error: {e}")
             traceback.print_exc()
             input("\nNhấn Enter để tiếp tục...")                      
-
         if input("\nTiếp tục xử lý đợt khác? (y/n): ").lower() == 'n': break
