@@ -1,7 +1,8 @@
 {
-  "version": "1.0.1",
-  "download_url": "https://github.com/hikikomori1870-bit/clean-truyen-hehe/releases/download/v1.0.1/clean_novel_2.exe",
-  "changelog": "Pig update điều chỉnh bộ lọc tăng ký tự = từ 5 lên thành 10."
+  "version": "1.0.2",
+  "download_url": "https://github.com/hikikomori1870-bit/clean-truyen-hehe/releases/download/v1.0.2/clean_novel_2.exe",
+  "changelog": "Pig update thêm điều kiện chia đến cuối file không còn nội dung thì end không chạy fallback nữa"
 
 }
+
 
