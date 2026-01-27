@@ -14,7 +14,7 @@ import subprocess
 import time
 import concurrent.futures
 
-CURRENT_VERSION = "1.0.0"
+CURRENT_VERSION = "1.0.1"
 GITHUB_USER = "hikikomori1870-bit"
 GITHUB_REPO = "clean-truyen-hehe"
 VERSION_URL = f"https://raw.githubusercontent.com/{GITHUB_USER}/{GITHUB_REPO}/main/version.json"
@@ -397,7 +397,7 @@ def split_and_format_v6_reindex(input_file, start_chapter_num=1, signature_text=
         print(f"❌ Không đọc được file: {input_file}")
         log_error(base_name, "Không đọc được file hoặc file trống.")
         return        
-    re_eq_sep = re.compile(r'^\s*={5,}\s*$')
+    re_eq_sep = re.compile(r'^\s*={10,}\s*$')
     re_dash_long = re.compile(r'^\s*-{40,}\s*$')    
     re_note_for_equals_mode = re.compile(r'^\s*(-{20,})\s*$')
     re_note_for_dash_mode = re.compile(r'^\s*([_*]{5,}|[—–─]{7,})\s*$')
