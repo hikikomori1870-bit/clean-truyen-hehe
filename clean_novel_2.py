@@ -14,7 +14,7 @@ import subprocess
 import time
 import concurrent.futures
 
-CURRENT_VERSION = "1.0.1"
+CURRENT_VERSION = "1.0.2"
 GITHUB_USER = "hikikomori1870-bit"
 GITHUB_REPO = "clean-truyen-hehe"
 VERSION_URL = f"https://raw.githubusercontent.com/{GITHUB_USER}/{GITHUB_REPO}/main/version.json"
@@ -451,8 +451,13 @@ def split_and_format_v6_reindex(input_file, start_chapter_num=1, signature_text=
                     while next_idx < total_lines and not lines[next_idx].strip(): next_idx += 1
                     if next_idx < total_lines:
                         raw_title = lines[next_idx].strip()
-                        is_new_chapter = True
-                        jump_to = next_idx
+                        if len(raw_title) > 80:
+                            is_new_chapter = False
+                        else:
+                            is_new_chapter = True
+                            jump_to = next_idx
+                    else:
+                        break
         if not is_new_chapter:
             re_explicit = re.compile(r'^\s*(番外|第\s*[0-9一二三四五六七八九十百千万]+\s*[章卷]|Quyển\s*[0-9一二三四五六七八九十百千万\d]+|Chương\s*\d+|Chapter\s*\d+|Hồi\s*\d+|^\d+[.,、\s]+|^\d+$)', re.IGNORECASE)            
             is_digit_dot_title = re.match(r'^\d+[\.,]{2,}', line) 
