@@ -1,8 +1,9 @@
 {
-  "version": "1.0.2",
-  "download_url": "https://github.com/hikikomori1870-bit/clean-truyen-hehe/releases/download/v1.0.2/clean_novel_2.exe",
-  "changelog": "Pig update thêm điều kiện chia đến cuối file không còn nội dung thì end không chạy fallback nữa"
+  "version": "1.0.3",
+  "download_url": "https://github.com/hikikomori1870-bit/clean-truyen-hehe/releases/download/v1.0.3/clean_novel_2.exe",
+  "changelog": "Pig update: ở chế độ DASH LONG aka cà chua tool sẽ auto bỏ qua dòng tiêu đề thứ 2 bị lặp lại theo raw tải được từ tool mới sửa"
 
 }
+
 
 
