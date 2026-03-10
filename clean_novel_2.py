@@ -14,7 +14,7 @@ import subprocess
 import time
 import concurrent.futures
 
-CURRENT_VERSION = "1.0.3"
+CURRENT_VERSION = "1.0.4"
 GITHUB_USER = "hikikomori1870-bit"
 GITHUB_REPO = "clean-truyen-hehe"
 VERSION_URL = f"https://raw.githubusercontent.com/{GITHUB_USER}/{GITHUB_REPO}/main/version.json"
@@ -150,7 +150,7 @@ def apply_replacements(text, replace_dict):
 def clean_chapter_title(line, current_index):
     final_text = line.strip()
     final_text = clean_common_entities(final_text)    
-    pattern = r'^(番外|第\s*[0-9一二三四五六七八九十百千万\s]+\s*[章卷]|Quyển\s*[0-9一二三四五六七八九十百千万\d]+|Chương\s*\d+|Chapter\s*\d+|Hồi\s*\d+|分卷阅读\s*\d*|^\d+[\s\.\-、]*)'                 
+    pattern = r'^(番外|第\s*[0-9一二三四五六七八九十百千万\s]+\s*[章卷]|Quyển\s*[0-9一二三四五六七八九十百千万\d]+|Chương\s*\d+|Chapter\s*\d+|Hồi\s*\d+|分卷阅读\s*\d*|^\d+[\s\.\-、]*|^\[\d+\]\s*)'                 
     text = final_text
     if len(final_text) > 3 and not final_text.isdigit():
         text = re.sub(pattern, '', final_text, flags=re.IGNORECASE)        
@@ -442,7 +442,9 @@ def split_and_format_v6_reindex(input_file, start_chapter_num=1, signature_text=
                     if k >= 0:
                         prev_line = lines[k].strip()
                         if len(prev_line) < 150:
-                            if current_lines and current_lines[-1].strip() == prev_line:
+                            test_prev = clean_garbage_text(prev_line, garbage_patterns)
+                            test_prev = normalize_punctuation(test_prev)                           
+                            if current_lines and current_lines[-1].strip() == test_prev:
                                 raw_title = current_lines.pop()
                                 is_new_chapter = True
                                 jump_to = i                 
@@ -465,9 +467,9 @@ def split_and_format_v6_reindex(input_file, start_chapter_num=1, signature_text=
                 if curr_line_clean and curr_line_clean == last_title_clean:
                     i += 1
                     continue
-            re_explicit = re.compile(r'^\s*(番外|第\s*[0-9一二三四五六七八九十百千万]+\s*[章卷]|Quyển\s*[0-9一二三四五六七八九十百千万\d]+|Chương\s*\d+|Chapter\s*\d+|Hồi\s*\d+|^\d+[.,、\s]+|^\d+$)', re.IGNORECASE)            
+            re_explicit = re.compile(r'^\s*(番外|第\s*[0-9一二三四五六七八九十百千万]+\s*[章卷]|Quyển\s*[0-9一二三四五六七八九十百千万\d]+|Chương\s*\d+|Chapter\s*\d+|Hồi\s*\d+|^\d+[.,、\s]+|^\[\d+\]|^\d+$)', re.IGNORECASE)            
             is_digit_dot_title = re.match(r'^\d+[\.,]{2,}', line) 
-            if (re_explicit.match(line) or is_digit_dot_title) and len(line) < 150:
+            if mode == "FALLBACK_KEYWORDS" and (re_explicit.match(line) or is_digit_dot_title) and len(line) < 150:
                 next_is_sep = False                
                 k = i + 1
                 while k < total_lines and not lines[k].strip():
