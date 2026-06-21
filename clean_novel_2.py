@@ -14,13 +14,62 @@ import subprocess
 import time
 import concurrent.futures
 
-CURRENT_VERSION = "1.0.4"
+class Colors:
+    """ANSI color codes cho terminal"""
+    HEADER = '\033[95m'
+    BLUE = '\033[94m'
+    CYAN = '\033[96m'
+    GREEN = '\033[92m'
+    YELLOW = '\033[93m'
+    RED = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+    LIGHT_GRAY = '\033[90m'
+    
+    @staticmethod
+    def disable():
+        """Tắt màu sắc cho Windows"""
+        if os.name == 'nt':
+            return
+        Colors.HEADER = ''
+        Colors.BLUE = ''
+        Colors.CYAN = ''
+        Colors.GREEN = ''
+        Colors.YELLOW = ''
+        Colors.RED = ''
+        Colors.ENDC = ''
+        Colors.BOLD = ''
+        Colors.UNDERLINE = ''
+        Colors.LIGHT_GRAY = ''
+
+CURRENT_VERSION = "1.0.5"
 GITHUB_USER = "hikikomori1870-bit"
 GITHUB_REPO = "clean-truyen-hehe"
 VERSION_URL = f"https://raw.githubusercontent.com/{GITHUB_USER}/{GITHUB_REPO}/main/version.json"
 
+def draw_header(text, width=70):
+    """Vẽ header đẹp"""
+    return f"\n{Colors.BOLD}{Colors.CYAN}{text.center(width, '═')}{Colors.ENDC}\n"
+
+def print_success(msg):
+    """In thông báo thành công"""
+    print(f"{Colors.GREEN}✅ {msg}{Colors.ENDC}")
+
+def print_error(msg):
+    """In thông báo lỗi"""
+    print(f"{Colors.RED}❌ {msg}{Colors.ENDC}")
+
+def print_warning(msg):
+    """In cảnh báo"""
+    print(f"{Colors.YELLOW}⚠️  {msg}{Colors.ENDC}")
+
+def print_info(msg):
+    """In thông tin"""
+    print(f"{Colors.BLUE}ℹ️  {msg}{Colors.ENDC}")
+
 def check_for_updates():
-    print(f"\n🔍 Đang kiểm tra bản cập nhật... (Phiên bản hiện tại: {CURRENT_VERSION})")
+    print(f"\n{Colors.CYAN}🔍 Đang kiểm tra bản cập nhật... (Phiên bản hiện tại: {CURRENT_VERSION}){Colors.ENDC}")
     try:
         with urllib.request.urlopen(VERSION_URL, timeout=5) as response:
             data = json.loads(response.read().decode())
@@ -28,15 +77,15 @@ def check_for_updates():
             download_url = data.get("download_url")
             changelog = data.get("changelog", "")
         if latest_version and latest_version != CURRENT_VERSION:
-            print(f"\n🚀 PHÁT HIỆN BẢN CẬP NHẬT MỚI: {latest_version}")
-            print(f"📝 Nội dung thay đổi: {changelog}")
-            choice = input("👉 Bạn có muốn cập nhật ngay không? (y/n): ").strip().lower()            
+            print(f"\n{Colors.BOLD}{Colors.GREEN}🚀 PHÁT HIỆN BẢN CẬP NHẬT MỚI: {latest_version}{Colors.ENDC}")
+            print(f"{Colors.YELLOW}📝 Nội dung thay đổi: {changelog}{Colors.ENDC}")
+            choice = input(f"{Colors.BOLD}👉 Bạn có muốn cập nhật ngay không? (y/n): {Colors.ENDC}").strip().lower()            
             if choice == 'y':
-                print("⏳ Đang tải xuống bản mới...")
+                print_info("Đang tải xuống bản mới...")
                 current_exe = sys.executable
                 new_exe = current_exe + ".new"
                 urllib.request.urlretrieve(download_url, new_exe)
-                print("✅ Tải xong! Đang cài đặt...")
+                print_success("Tải xong! Đang cài đặt...")
                 batch_script = f"""
 @echo off
 timeout /t 2 /nobreak > NUL
@@ -51,25 +100,29 @@ del "%~f0"
                 subprocess.Popen(batch_file, shell=True)
                 sys.exit(0)
         else:
-            print("✅ Bạn đang dùng phiên bản mới nhất.")
+            print_success("Bạn đang dùng phiên bản mới nhất.")
             time.sleep(1)
     except Exception as e:
-        print(f"⚠️ Không thể kiểm tra cập nhật: {e}")
+        print_warning(f"Không thể kiểm tra cập nhật: {e}")
         print("   (Bỏ qua và tiếp tục chạy chương trình...)")
         time.sleep(1)
+
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', line_buffering=True)
 INDENT_STYLE = "\u3000\u3000" 
 REPLACEMENT_CONFIG_FILE = "replacements.txt"
 GARBAGE_CONFIG_FILE = "garbage.txt" 
+
 def fast_print(*args, **kwargs):
     kwargs['flush'] = True
     print(*args, **kwargs)
+
 def log_error(file_name, message):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     try:
         with open("processing_errors.log", "a", encoding="utf-8") as f:
             f.write(f"[{timestamp}] {file_name}: {message}\n")
     except: pass
+
 def load_garbage_patterns():
     patterns = [
         r'https?://\S+', r'www\.\S+', r'\w+\.com', r'\w+\.net',
@@ -82,6 +135,7 @@ def load_garbage_patterns():
                     if line.strip(): patterns.append(line.strip())
         except: pass
     return patterns
+
 def clean_garbage_text(text, patterns=None):
     if patterns is None:
         patterns = load_garbage_patterns()
@@ -90,11 +144,13 @@ def clean_garbage_text(text, patterns=None):
             text = re.sub(pattern, '', text, flags=re.IGNORECASE)
         except: pass
     return text
+
 def normalize_punctuation(text):
     text = re.sub(r'\s+([,.:;?!])', r'\1', text)
     text = re.sub(r'([,.:;?!])(?=[^\s\d])', r'\1 ', text)
     text = re.sub(r' +', ' ', text)
     return text
+
 def load_replacements():
     replace_dict = {}
     if os.path.exists(REPLACEMENT_CONFIG_FILE):
@@ -107,6 +163,7 @@ def load_replacements():
                             replace_dict[parts[0].strip()] = parts[1].strip()
         except: pass
     return replace_dict
+
 def cn_to_int(cn_str):
     cn_map = {
         '〇': 0, '零': 0, '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, 
@@ -136,21 +193,25 @@ def cn_to_int(cn_str):
         result += temp
         return result
     except: return 0
+
 def sanitize_filename(name):
     clean = re.sub(r'[\\/*?:"<>|]', "", name).strip()
     return clean[:100]
+
 def clean_common_entities(text):
     text = html.unescape(text)
     text = text.replace("&nbsp;", " ")
     return text
+
 def apply_replacements(text, replace_dict):
     for old, new in replace_dict.items():
         text = text.replace(old, new)
     return text
+
 def clean_chapter_title(line, current_index):
     final_text = line.strip()
     final_text = clean_common_entities(final_text)    
-    pattern = r'^(番外|第\s*[0-9一二三四五六七八九十百千万\s]+\s*[章卷]|Quyển\s*[0-9一二三四五六七八九十百千万\d]+|Chương\s*\d+|Chapter\s*\d+|Hồi\s*\d+|分卷阅读\s*\d*|^\d+[\s\.\-、]*|^\[\d+\]\s*)'                 
+    pattern = r'^[◇◆●○○■□▪▫▬▭▮▯➤➣➢➡⬎⬏↪↬↭↮▶▷▸▹►▻◀◁◂◃◄◅⏩⏪⏫⏬⏭⏮╰╯╱╲╳‧·∙╔╗╚╝═║╒╓╔╕╖╗╘╙╚╛╜╝╞╟╠╡╢╣╤╥╦╧╨╩╪╫╬\-*~_\s]*(番外|第\s*[0-9一二三四五六七八九十百千万\s]+\s*[章卷]|Quyển\s*[0-9一二三四五六七八九十百千万\d]+|Chương\s*\d+|Chapter\s*\d+|Hồi\s*\d+|分卷阅读\s*\d*|^\d+[\s\.\-、]*|^\[\d+\]\s*)'
     text = final_text
     if len(final_text) > 3 and not final_text.isdigit():
         text = re.sub(pattern, '', final_text, flags=re.IGNORECASE)        
@@ -158,8 +219,9 @@ def clean_chapter_title(line, current_index):
     if "番外" in final_text and "番外" not in text:
         text = "番外 " + text       
     return text if text else f"第{current_index}章"
+
 def check_sequence_gaps(raw_chapter_titles):
-    print(f"\n{'*'*20} KIỂM TRA LỖI ĐÁNH SỐ CỦA TÁC GIẢ {'*'*20}")
+    print(draw_header("KIỂM TRA LỖI ĐÁNH SỐ CỦA TÁC GIẢ"))
     last_num = None
     has_gap = False   
     num_pattern = re.compile(r'(?:第\s*([0-9一二三四五六七八九十百千万]+)\s*[章回]|Chương\s*(\d+)|^\s*(\d+))', re.IGNORECASE)
@@ -170,21 +232,22 @@ def check_sequence_gaps(raw_chapter_titles):
             current_num = cn_to_int(val_str)            
             if last_num is not None:
                 if current_num > last_num + 1:
-                    print(f"❌ PHÁT HIỆN THIẾU CHƯƠNG: Tác giả viết từ [{last_num}] nhảy vọt lên [{current_num}]")
+                    print_error(f"PHÁT HIỆN THIẾU CHƯƠNG: Tác giả viết từ [{last_num}] nhảy vọt lên [{current_num}]")
                     print(f"   -> Dòng lỗi trong file: \"{raw_title}\"")
                     has_gap = True
                 elif current_num < last_num:
-                    print(f"⚠️ CẢNH BÁO: Số chương bị lùi hoặc trùng: [{last_num}] xuống [{current_num}]")
+                    print_warning(f"CẢNH BÁO: Số chương bị lùi hoặc trùng: [{last_num}] xuống [{current_num}]")
                     print(f"   -> Dòng nghi vấn: \"{raw_title}\"")
                     has_gap = True            
             last_num = current_num            
     if not has_gap:
-        print("✅ Chúc mừng: Tác giả của bợn đánh số chương chuẩn vl, không thấy đứt đoạn.")
+        print_success("Chúc mừng: Tác giả của bạn đánh số chương chuẩn, không thấy đứt đoạn.")
     else:
-        print(f"\n❗ Lưu ý: Bạn nên kiểm tra lại file gốc tại các vị trí báo lỗi trên.")
-    print(f"{'*'*65}\n")
+        print(f"\n{Colors.YELLOW}❗ Lưu ý: Bạn nên kiểm tra lại file gốc tại các vị trí báo lỗi trên.{Colors.ENDC}")
+    print("=" * 65 + "\n")
+
 def interactive_check_chapters(chapters, is_silent=False):
-    print(f"\n{'='*20} RÀ SOÁT CHƯƠNG NGẮN/LỖI {'='*20}")
+    print(draw_header("RÀ SOÁT CHƯƠNG NGẮN/LỖI"))
     refined_chapters = []
     i = 0    
     history_stack = [] 
@@ -199,49 +262,49 @@ def interactive_check_chapters(chapters, is_silent=False):
                     if refined_chapters:
                         prev_title, prev_lines = refined_chapters[-1]
                         prev_lines.extend(current_lines)
-                        print(f"🤖 [Auto] Gộp chương siêu ngắn '{current_title}' ({char_count} chars) vào chương trước.")
+                        print(f"{Colors.CYAN}🤖 [Auto] Gộp chương siêu ngắn '{current_title}' ({char_count} chars) vào chương trước.{Colors.ENDC}")
                     else:
                         refined_chapters.append((current_title, current_lines))
                 else:
                     refined_chapters.append((current_title, current_lines))
-                    print(f"🤖 [Auto] Giữ chương ngắn '{current_title}' ({char_count} chars).")
+                    print(f"{Colors.CYAN}🤖 [Auto] Giữ chương ngắn '{current_title}' ({char_count} chars).{Colors.ENDC}")
                 i += 1
             else:
                 current_state_snapshot = [
                     (t, list(l)) for t, l in refined_chapters
                 ]                
-                print(f"{'!'*10} PHÁT HIỆN CHƯƠNG NGHI VẤN {'!'*10}")
-                print(f"🔖 Tiêu đề: {current_title}") 
+                print(f"\n{Colors.BOLD}{Colors.YELLOW}{'!'*10} PHÁT HIỆN CHƯƠNG NGHI VẤN {'!'*10}{Colors.ENDC}")
+                print(f"{Colors.BOLD}🔖 Tiêu đề: {current_title}{Colors.ENDC}") 
                 print(f"📉 Độ dài: {char_count} ký tự")
-                print(f"📄 Trích đoạn:\n{'-'*30}")
+                print(f"📄 Trích đoạn:\n{Colors.LIGHT_GRAY}{'-'*30}")
                 print('\n'.join([str(l).strip() for l in current_lines[:6] if str(l).strip()]))
-                print(f"{'-'*30}")            
-                print("👉 Chọn cách xử lý:")
+                print(f"{'-'*30}{Colors.ENDC}")            
+                print(f"{Colors.BOLD}👉 Chọn cách xử lý:{Colors.ENDC}")
                 print("   [1] GỘP vào chương trước (Giữ nguyên toàn bộ nội dung)")
                 print("   [2] GIỮ NGUYÊN (Để thành chương riêng)")
                 print("   [3] XÓA BỎ (Nếu là rác)")
                 print("   [b] QUAY LẠI (Undo quyết định trước đó)")                
-                choice = input("   Nhập lựa chọn (Enter=1, b=Back): ").strip()                
+                choice = input(f"{Colors.BOLD}   Nhập lựa chọn (Enter=1, b=Back): {Colors.ENDC}").strip()                
                 if choice.lower() == 'b':
                     if not history_stack:
-                        print("⚠️ Không thể quay lại xa hơn (Đây là chương đầu tiên hoặc chưa có lịch sử)!")
+                        print_warning("Không thể quay lại xa hơn (Đây là chương đầu tiên hoặc chưa có lịch sử)!")
                         continue 
                     else:
                         last_i, last_refined_chapters = history_stack.pop()
                         i = last_i
                         refined_chapters = last_refined_chapters
-                        print("⏪ Đã quay lại quyết định trước đó.")
+                        print(f"{Colors.CYAN}⏪ Đã quay lại quyết định trước đó.{Colors.ENDC}")
                         continue
                 history_stack.append((i, current_state_snapshot))
                 if choice == '2':
                     refined_chapters.append((current_title, current_lines))
                 elif choice == '3':
-                    print("🗑️ Đã xóa.\n")
+                    print(f"{Colors.RED}🗑️ Đã xóa.\n{Colors.ENDC}")
                 else:
                     if refined_chapters:
                         prev_title, prev_lines = refined_chapters[-1]
                         prev_lines.extend(current_lines) 
-                        print(f"🔗 Đã gộp thành công.\n")
+                        print(f"{Colors.GREEN}🔗 Đã gộp thành công.\n{Colors.ENDC}")
                     else:
                         refined_chapters.append((current_title, current_lines))                
                 i += 1
@@ -249,6 +312,7 @@ def interactive_check_chapters(chapters, is_silent=False):
             refined_chapters.append((current_title, current_lines))
             i += 1            
     return refined_chapters
+
 def verify_and_report_final(output_dir, chapters_with_notes):
     if not os.path.exists(output_dir): return
     files = [f for f in os.listdir(output_dir) if f.endswith(".txt")]            
@@ -260,16 +324,18 @@ def verify_and_report_final(output_dir, chapters_with_notes):
         return int(nums[0]) if nums else 0            
     files.sort(key=get_sort_key)
     safe_notes = {sanitize_filename(name) for name in chapters_with_notes}
-    print(f"\n{'STT':<5} {'DUNG LƯỢNG':<12} {'[TG]':<6} {'TÊN FILE'}")
+    print(f"{Colors.BOLD}{'STT':<5} {'DUNG LƯỢNG':<12} {'[TG]':<6} {'TÊN FILE'}{Colors.ENDC}")
     print("-" * 80)    
     for idx, f in enumerate(files):
         size = os.path.getsize(os.path.join(output_dir, f))
         file_name_no_ext = os.path.splitext(f)[0]
         has_note = "[v]" if file_name_no_ext in safe_notes else ""
-        print(f"{idx+1:<5} {size:<12} {has_note:<6} {f}")
+        color = Colors.GREEN if has_note else Colors.LIGHT_GRAY
+        print(f"{color}{idx+1:<5} {size:<12} {has_note:<6} {f}{Colors.ENDC}")
+
 def create_epub_file(output_path, book_title, chapters, author="Unknown", cover_path=None):
     """Tạo file EPUB từ danh sách chương mà không cần thư viện ngoài"""
-    print(f"📚 Đang đóng gói EPUB: {output_path} ...")    
+    print_info(f"Đang đóng gói EPUB: {output_path} ...")    
     try:
         with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as z:
             z.writestr("mimetype", "application/epub+zip", zipfile.ZIP_STORED)           
@@ -357,10 +423,11 @@ p { text-indent: 2em; margin-bottom: 0.5em; text-align: justify; }
     </navMap>
 </ncx>'''
             z.writestr("OEBPS/toc.ncx", ncx_content)            
-        print("✅ Đã tạo EPUB thành công!")
+        print_success("Đã tạo EPUB thành công!")
     except Exception as e:
-        print(f"❌ Lỗi khi tạo EPUB: {e}")
+        print_error(f"Lỗi khi tạo EPUB: {e}")
         log_error(book_title, f"Lỗi tạo EPUB: {e}")
+
 def split_and_format_v6_reindex(input_file, start_chapter_num=1, signature_text="", 
                                 output_mode="split", is_silent=False, indent_str="\u3000\u3000", keep_original_numbering=False):
     base_name = os.path.splitext(os.path.basename(input_file))[0]
@@ -383,9 +450,9 @@ def split_and_format_v6_reindex(input_file, start_chapter_num=1, signature_text=
                     full_text = clean_common_entities(full_text)
                     full_text = apply_replacements(full_text, replacements)
                     lines = full_text.splitlines()
-                if not is_silent: print(" Hoàn tất!", flush=True)
+                if not is_silent: print(f"{Colors.GREEN} Hoàn tất!{Colors.ENDC}", flush=True)
             else:
-                if not is_silent: print(f"File lớn ({file_size/1024/1024:.1f}MB), dùng chế độ đọc từng dòng để tiết kiệm RAM...")
+                if not is_silent: print_info(f"File lớn ({file_size/1024/1024:.1f}MB), dùng chế độ đọc từng dòng để tiết kiệm RAM...")
                 with open(input_file, 'r', encoding=enc) as f:
                     for line in f:
                         l = clean_common_entities(line)
@@ -394,7 +461,7 @@ def split_and_format_v6_reindex(input_file, start_chapter_num=1, signature_text=
             if lines: break
         except: continue                                   
     if not lines: 
-        print(f"❌ Không đọc được file: {input_file}")
+        print_error(f"Không đọc được file: {input_file}")
         log_error(base_name, "Không đọc được file hoặc file trống.")
         return        
     re_eq_sep = re.compile(r'^\s*={10,}\s*$')
@@ -412,7 +479,7 @@ def split_and_format_v6_reindex(input_file, start_chapter_num=1, signature_text=
         mode = "PRIORITY_DASH_LONG"
     else:
         mode = "FALLBACK_KEYWORDS"           
-    if not is_silent: print(f"[{base_name}] Thống kê: [=]: {eq_count} | [-]: {dash_long_count} -> MODE: {mode}")    
+    if not is_silent: print(f"{Colors.CYAN}[{base_name}] Thống kê: [=]: {eq_count} | [-]: {dash_long_count} -> MODE: {mode}{Colors.ENDC}")    
     chapters = []
     raw_titles_for_check = []
     current_title = "Phần mở đầu"
@@ -466,8 +533,8 @@ def split_and_format_v6_reindex(input_file, start_chapter_num=1, signature_text=
                 curr_line_clean = re.sub(r'\W+', '', line)                
                 if curr_line_clean and curr_line_clean == last_title_clean:
                     i += 1
-                    continue
-            re_explicit = re.compile(r'^\s*(番外|第\s*[0-9一二三四五六七八九十百千万]+\s*[章卷]|Quyển\s*[0-9一二三四五六七八九十百千万\d]+|Chương\s*\d+|Chapter\s*\d+|Hồi\s*\d+|^\d+[.,、\s]+|^\[\d+\]|^\d+$)', re.IGNORECASE)            
+                    continue 
+            re_explicit = re.compile(r'^\s*[◇◆●○■□▪▫▬▭▮▯➤➣➢➡⏩⏪⏫⏬⏭⏮▶▷▸▹►▻◀◁◂◃◄◅╰╯╱╲\-*~_\s]*(番外|第\s*[0-9一二三四五六七八九十百千万]+\s*[章卷]|Quyển\s*[0-9一二三四五六七八九十百千万\d]+|Chương\s*\d+|Chapter\s*\d+|Hồi\s*\d+|^\d+[.,、\s]+|^\[\d+\]|^\d+$)', re.IGNORECASE)            
             is_digit_dot_title = re.match(r'^\d+[\.,]{2,}', line) 
             if mode == "FALLBACK_KEYWORDS" and (re_explicit.match(line) or is_digit_dot_title) and len(line) < 150:
                 next_is_sep = False                
@@ -503,21 +570,21 @@ def split_and_format_v6_reindex(input_file, start_chapter_num=1, signature_text=
                             do_rollback = False
                             while True:
                                 reason = "SỐ ĐẦU DÒNG (Dễ nhầm liệt kê)" if is_digit_start else f"MODE {mode}"
-                                print(f"\n{'?'*10} PHÁT HIỆN NGHI VẤN [{reason}] {'?'*10}")
-                                print(f"📌 Dòng: {line}")
-                                print("👉 Lựa chọn:")
+                                print(f"\n{Colors.BOLD}{Colors.YELLOW}{'?'*10} PHÁT HIỆN NGHI VẤN [{reason}] {'?'*10}{Colors.ENDC}")
+                                print(f"📌 Dòng: {Colors.LIGHT_GRAY}{line}{Colors.ENDC}")
+                                print(f"{Colors.BOLD}👉 Lựa chọn:{Colors.ENDC}")
                                 print("   [1] TÁCH CHƯƠNG (Đây là tiêu đề)")
                                 print("   [2] BỎ QUA (Đây là nội dung/đếm ngược/liệt kê)")
                                 print("   [b] QUAY LẠI (Undo quyết định trước đó)")
-                                choice = input("   Nhập (Enter=2, b=Back): ").strip()                               
+                                choice = input(f"{Colors.BOLD}   Nhập (Enter=2, b=Back): {Colors.ENDC}").strip()                               
                                 if choice.lower() == 'b':
                                     if not decision_history:
-                                        print("⚠️ Không thể quay lại xa hơn!")
+                                        print_warning("Không thể quay lại xa hơn!")
                                         continue
                                     else:
                                         (i, chapters, current_title, current_lines, temp_idx, raw_titles_for_check) = decision_history.pop()
                                         do_rollback = True
-                                        print("⏪ Đã quay lại điểm quyết định trước đó!")
+                                        print(f"{Colors.CYAN}⏪ Đã quay lại điểm quyết định trước đó!{Colors.ENDC}")
                                         break
                                 if choice == '1':
                                     is_new_chapter = True
@@ -546,21 +613,21 @@ def split_and_format_v6_reindex(input_file, start_chapter_num=1, signature_text=
                     snapshot = (i, list(chapters), current_title, list(current_lines), temp_idx, list(raw_titles_for_check))
                     do_rollback = False                    
                     while True:
-                        print(f"\n{'!'*10} CẢNH BÁO TIÊU ĐỀ DÀI ({len(raw_title)} ký tự) {'!'*10}")
-                        print(f"🔎 Nội dung: {raw_title}")
-                        print("👉 Lựa chọn:")
+                        print(f"\n{Colors.BOLD}{Colors.YELLOW}{'!'*10} CẢNH BÁO TIÊU ĐỀ DÀI ({len(raw_title)} ký tự) {'!'*10}{Colors.ENDC}")
+                        print(f"{Colors.LIGHT_GRAY}🔎 Nội dung: {raw_title}{Colors.ENDC}")
+                        print(f"{Colors.BOLD}👉 Lựa chọn:{Colors.ENDC}")
                         print("   [1] CHẤP NHẬN tách chương (Đây là tiêu đề)")
                         print("   [2] BỎ QUA và gộp (Đây là nội dung văn bản)")
                         print("   [b] QUAY LẠI (Undo quyết định trước đó)")
-                        choice = input("   Nhập (Enter=1, b=Back): ").strip()                        
+                        choice = input(f"{Colors.BOLD}   Nhập (Enter=1, b=Back): {Colors.ENDC}").strip()                        
                         if choice.lower() == 'b':
                             if not decision_history:
-                                print("⚠️ Không thể quay lại xa hơn!")
+                                print_warning("Không thể quay lại xa hơn!")
                                 continue
                             else:
                                 (i, chapters, current_title, current_lines, temp_idx, raw_titles_for_check) = decision_history.pop()
                                 do_rollback = True
-                                print("⏪ Đã quay lại điểm quyết định trước đó!")
+                                print(f"{Colors.CYAN}⏪ Đã quay lại điểm quyết định trước đó!{Colors.ENDC}")
                                 break
                         if choice == '2':
                             is_new_chapter = False
@@ -680,7 +747,7 @@ def split_and_format_v6_reindex(input_file, start_chapter_num=1, signature_text=
         new_content[0] = new_title_str       
         if signature_text: new_content.append("\n" + signature_text)        
         final_processed_chapters.append((new_title_str, new_content))   
-    if not is_silent: print(f"\n⚡ Đang xuất file dưới dạng: {output_mode.upper()}...")   
+    if not is_silent: print(f"\n⚡ Đang xuất file dưới dạng: {Colors.BOLD}{output_mode.upper()}{Colors.ENDC}...")   
     if output_mode == "split":
         count = 0
         for title, content in final_processed_chapters:
@@ -692,10 +759,10 @@ def split_and_format_v6_reindex(input_file, start_chapter_num=1, signature_text=
             except Exception as e:
                 log_error(base_name, f"Lỗi ghi chương {title}: {e}")
         if not is_silent:
-            print(f"\n" + " TỔNG KẾT DỮ LIỆU ".center(60, "="))
-            print(f"📊 Tổng số chương: {count}")
-            print(f"📝 Tổng ký tự nội dung: {total_chars:,}")
-            print(f"📂 Thư mục: {output_dir}")
+            print(draw_header("TỔNG KẾT DỮ LIỆU"))
+            print(f"📊 Tổng số chương: {Colors.BOLD}{Colors.GREEN}{count}{Colors.ENDC}")
+            print(f"📝 Tổng ký tự nội dung: {Colors.BOLD}{Colors.GREEN}{total_chars:,}{Colors.ENDC}")
+            print(f"📂 Thư mục: {Colors.BOLD}{output_dir}{Colors.ENDC}")
             print(f"💡 Chú thích: [v] = Chương có lời tác giả")
             verify_and_report_final(output_dir, chapters_with_notes)            
     elif output_mode == "merge":
@@ -703,7 +770,7 @@ def split_and_format_v6_reindex(input_file, start_chapter_num=1, signature_text=
         try:
             with open(out_file, 'w', encoding='utf-8-sig') as f:
                 f.write('\n\n'.join(['\n'.join(map(str, c)) for t, c in final_processed_chapters]))
-            print(f"✅ Đã gộp file: {out_file}")
+            print_success(f"Đã gộp file: {out_file}")
         except Exception as e:
             log_error(base_name, f"Lỗi ghi file merge: {e}") 
     elif output_mode == "epub":
@@ -718,9 +785,10 @@ def split_and_format_v6_reindex(input_file, start_chapter_num=1, signature_text=
             full_p = os.path.join(input_dir, p)
             if os.path.exists(full_p):
                 cover_path = full_p
-                print(f"🖼️ Phát hiện ảnh bìa: {p}")
+                print(f"🖼️ {Colors.YELLOW}Phát hiện ảnh bìa: {p}{Colors.ENDC}")
                 break       
         create_epub_file(out_file, base_name, epub_chapters, cover_path=cover_path)
+
 if __name__ == "__main__":
     check_for_updates()
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -744,31 +812,32 @@ if __name__ == "__main__":
                 f.write(text)
             return True
         except Exception as e:
-            print(f"⚠️ Lỗi không thể lưu file ghi nhớ: {e}")
+            print_warning(f"Lỗi không thể lưu file ghi nhớ: {e}")
             return False                
     while True:
         os.system('cls' if os.name == 'nt' else 'clear')
-        print(" TOOL CLEAN RAW ".center(70, "="))
-        print("💡 Hỗ trợ: Kéo thả 1 File .txt HOẶC 1 Thư mục (Batch Mode)")        
+        print(draw_header("TOOL CLEAN RAW - Version " + CURRENT_VERSION, 70))
+        print(f"{Colors.CYAN}💡 Hỗ trợ: Kéo thả 1 File .txt HOẶC 1 Thư mục (Batch Mode){Colors.ENDC}")        
         try:
-            path_input = input("👉 Đường dẫn: ").strip('"').strip("'").strip()
+            path_input = input(f"{Colors.BOLD}👉 Đường dẫn: {Colors.ENDC}").strip('"').strip("'").strip()
             if path_input.lower() in ['q', 'exit']: break                                                                    
             target_files = []
             if os.path.isfile(path_input):
                 target_files.append(path_input)
             elif os.path.isdir(path_input):
-                print(f"📂 Đã phát hiện thư mục. Đang quét file .txt...")
+                print_info(f"Đã phát hiện thư mục. Đang quét file .txt...")
                 for root, dirs, files in os.walk(path_input):
                     for file in files:
                         if file.lower().endswith(".txt") and "_Split" not in root:
                             target_files.append(os.path.join(root, file))
-                print(f"📊 Tìm thấy {len(target_files)} file .txt")
+                print(f"{Colors.CYAN}📊 Tìm thấy {len(target_files)} file .txt{Colors.ENDC}")
             else:
-                print("❌ Đường dẫn không tồn tại.")
+                print_error("Đường dẫn không tồn tại.")
                 input("Nhấn Enter để quay lại...")
                 continue                
             if not target_files:
-                input("❌ Không có file nào để xử lý. Enter...")
+                print_error("Không có file nào để xử lý.")
+                input("Enter để quay lại...")
                 continue
             output_mode = "split"
             is_silent = False
@@ -780,15 +849,16 @@ if __name__ == "__main__":
             cancel_process = False            
             while step <= 6:
                 os.system('cls' if os.name == 'nt' else 'clear')
-                print(f"📂 Đang thiết lập cho: {os.path.basename(path_input)}")
+                print(draw_header(f"THIẾT LẬP [{step}/6]"))
+                print(f"{Colors.CYAN}📂 Đang thiết lập cho: {os.path.basename(path_input)}")
                 print(f"ℹ️  Tìm thấy: {len(target_files)} files")
-                print("(💡 Mẹo: Nhập 'b' và Enter để quay lại bước trước)\n")
+                print(f"💡 Mẹo: Nhập 'b' và Enter để quay lại bước trước{Colors.ENDC}\n")
                 if step == 1:
-                    print("⚙️ [1/6] CẤU HÌNH ĐỊNH DẠNG:")
-                    print("1. Xuất ra Folder từng chương (Split)")
-                    print("2. Xuất ra 1 File gộp (Merge Txt)")
-                    print("3. Xuất ra Ebook (EPUB)")
-                    out_choice = input("👉 Chọn định dạng (Enter=1): ").strip()
+                    print(f"{Colors.BOLD}⚙️ [1/6] CẤU HÌNH ĐỊNH DẠNG:{Colors.ENDC}")
+                    print("   1. Xuất ra Folder từng chương (Split) 📂")
+                    print("   2. Xuất ra 1 File gộp (Merge Txt) 📄")
+                    print("   3. Xuất ra Ebook (EPUB) 📚")
+                    out_choice = input(f"{Colors.BOLD}👉 Chọn định dạng (Enter=1): {Colors.ENDC}").strip()
                     if out_choice.lower() == 'b': 
                         cancel_process = True
                         break                    
@@ -797,21 +867,21 @@ if __name__ == "__main__":
                     elif out_choice == '3': output_mode = "epub"
                     step += 1
                 elif step == 2:
-                    print(f"🤖 [2/6] CHẾ ĐỘ TỰ ĐỘNG (SILENT MODE)?")
-                    print("   [y] Có (Tự sửa lỗi, không hỏi, thích hợp treo máy)")
-                    print("   [n] Không (Dừng lại hỏi khi gặp lỗi - An toàn hơn)")
-                    silent_input = input("👉 Chọn (y/n, Enter=n): ").lower().strip()
+                    print(f"{Colors.BOLD}🤖 [2/6] CHẾ ĐỘ TỰ ĐỘNG (SILENT MODE)?{Colors.ENDC}")
+                    print("   [y] Có (Tự sửa lỗi, không hỏi, thích hợp treo máy) 🚀")
+                    print("   [n] Không (Dừng lại hỏi khi gặp lỗi - An toàn hơn) 🛡️")
+                    silent_input = input(f"{Colors.BOLD}👉 Chọn (y/n, Enter=n): {Colors.ENDC}").lower().strip()
                     if silent_input == 'b':
                         step = 1
                         continue
                     is_silent = (silent_input == 'y')
                     step += 1
                 elif step == 3:
-                    print("\n📝 [3/6] KIỂU THỤT ĐẦU DÒNG:")
-                    print("   [1] Chuẩn Trung (2 ký tự 　　)")
-                    print("   [2] Chuẩn Việt (1 Tab)")
-                    print("   [3] 4 Dấu cách") 
-                    indent_choice = input("👉 Chọn (Enter=1): ").strip()
+                    print(f"\n{Colors.BOLD}📝 [3/6] KIỂU THỤT ĐẦU DÒNG:{Colors.ENDC}")
+                    print("   [1] Chuẩn Trung (2 ký tự 　　) 🇨🇳")
+                    print("   [2] Chuẩn Việt (1 Tab) 🇻🇳")
+                    print("   [3] 4 Dấu cách 🔧") 
+                    indent_choice = input(f"{Colors.BOLD}👉 Chọn (Enter=1): {Colors.ENDC}").strip()
                     if indent_choice.lower() == 'b':
                         step = 2
                         continue
@@ -820,10 +890,10 @@ if __name__ == "__main__":
                     elif indent_choice == '3': indent_str = "    "
                     step += 1
                 elif step == 4:
-                    print("\n🔢 [4/6] CHẾ ĐỘ ĐÁNH SỐ CHƯƠNG:")
-                    print("   [1] Tự động đánh lại (1, 2, 3...) - Nên dùng nếu file đầy đủ toàn bộ từ 1 đến hết")
-                    print("   [2] Giữ nguyên số của tác giả (Theo file gốc) - Nên dùng nếu file là các chương không bắt đầu từ 1")
-                    num_mode_choice = input("👉 Chọn (Enter=1): ").strip()
+                    print(f"\n{Colors.BOLD}🔢 [4/6] CHẾ ĐỘ ĐÁNH SỐ CHƯƠNG:{Colors.ENDC}")
+                    print("   [1] Tự động đánh lại (1, 2, 3...) - Nên dùng nếu file đầy đủ toàn bộ 🔄")
+                    print("   [2] Giữ nguyên số của tác giả - Nên dùng nếu file không bắt đầu từ 1 📌")
+                    num_mode_choice = input(f"{Colors.BOLD}👉 Chọn (Enter=1): {Colors.ENDC}").strip()
                     if num_mode_choice.lower() == 'b':
                         step = 3
                         continue
@@ -833,20 +903,20 @@ if __name__ == "__main__":
                     if len(target_files) > 1 or keep_original:
                         step += 1
                         continue                        
-                    print("\n🔢 [5/6] THIẾT LẬP SỐ CHƯƠNG:")
-                    s_num = input("👉 Số chương bắt đầu (Enter=1): ").strip()
+                    print(f"\n{Colors.BOLD}🔢 [5/6] THIẾT LẬP SỐ CHƯƠNG:{Colors.ENDC}")
+                    s_num = input(f"{Colors.BOLD}👉 Số chương bắt đầu (Enter=1): {Colors.ENDC}").strip()
                     if s_num.lower() == 'b':
                         step = 4
                         continue
                     start_num = int(s_num) if s_num.isdigit() else 1
                     step += 1
                 elif step == 6:
-                    print("\n✍️ [6/6] CHỮ KÝ CUỐI CHƯƠNG:")
+                    print(f"\n{Colors.BOLD}✍️ [6/6] CHỮ KÝ CUỐI CHƯƠNG:{Colors.ENDC}")
                     saved_sig = load_signature()
                     sig = ""
                     if saved_sig:
-                        print(f"⭐ Chữ ký đang nhớ: {saved_sig}")
-                        sig_input = input("👉 Enter dùng lại, nhập mới để đổi, 'x' xóa: ").strip()
+                        print(f"{Colors.YELLOW}⭐ Chữ ký đang nhớ: {saved_sig}{Colors.ENDC}")
+                        sig_input = input(f"{Colors.BOLD}👉 Enter dùng lại, nhập mới để đổi, 'x' xóa: {Colors.ENDC}").strip()
                         if sig_input.lower() == 'b':
                             if len(target_files) > 1 or keep_original:
                                 step = 4
@@ -856,12 +926,12 @@ if __name__ == "__main__":
                         if sig_input == "": sig = saved_sig
                         elif sig_input.lower() == 'x': 
                             save_signature("")
-                            print("✅ Đã xóa chữ ký.")
+                            print_success("Đã xóa chữ ký.")
                         else: 
                             sig = sig_input
                             save_signature(sig)
                     else:
-                        sig_input = input("👉 Nhập chữ ký (Enter bỏ qua): ").strip()
+                        sig_input = input(f"{Colors.BOLD}👉 Nhập chữ ký (Enter bỏ qua): {Colors.ENDC}").strip()
                         if sig_input.lower() == 'b':
                             if len(target_files) > 1 or keep_original:
                                 step = 4
@@ -874,9 +944,9 @@ if __name__ == "__main__":
                     step += 1            
             if cancel_process:
                 continue
-            print(f"\n🚀 BẮT ĐẦU XỬ LÝ {len(target_files)} FILE...\n")
+            print(f"\n{Colors.BOLD}{Colors.GREEN}🚀 BẮT ĐẦU XỬ LÝ {len(target_files)} FILE...{Colors.ENDC}\n")
             if is_silent and len(target_files) > 1:
-                print(f"⚡ Đang chạy chế độ ĐA LUỒNG (Max 4 tiến trình)...")
+                print_info(f"Đang chạy chế độ ĐA LUỒNG (Max 4 tiến trình)...")
                 with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
                     futures = []
                     for fpath in target_files:
@@ -894,10 +964,10 @@ if __name__ == "__main__":
                         try:
                             future.result()
                         except Exception as e:
-                            print(f"❌ Có lỗi trong thread: {e}")
+                            print_error(f"Có lỗi trong thread: {e}")
             else:
                 for idx, fpath in enumerate(target_files):
-                    print(f"⏳ [{idx+1}/{len(target_files)}] Processing: {os.path.basename(fpath)}...")
+                    print(f"{Colors.CYAN}⏳ [{idx+1}/{len(target_files)}] Processing: {os.path.basename(fpath)}...{Colors.ENDC}")
                     try:
                         split_and_format_v6_reindex(
                             input_file=fpath,
@@ -909,13 +979,13 @@ if __name__ == "__main__":
                             keep_original_numbering=keep_original
                         ) 
                     except Exception as e:
-                        print(f"❌ Lỗi file {fpath}: {e}")
+                        print_error(f"Lỗi file {fpath}: {e}")
                         log_error(os.path.basename(fpath), f"Critical Error: {e}")
                         traceback.print_exc()            
-            print("\n✅ HOÀN TẤT TẤT CẢ TÁC VỤ.")            
+            print(f"\n{Colors.BOLD}{Colors.GREEN}✅ HOÀN TẤT TẤT CẢ TÁC VỤ.{Colors.ENDC}")            
         except Exception as e: 
-            print(f"❌ Lỗi Critical: {e}")
+            print_error(f"Lỗi Critical: {e}")
             log_error("SYSTEM", f"Critical System Error: {e}")
             traceback.print_exc()
             input("\nNhấn Enter để tiếp tục...")                      
-        if input("\nTiếp tục xử lý đợt khác? (y/n): ").lower() == 'n': break
+        if input(f"\n{Colors.BOLD}Tiếp tục xử lý đợt khác? (y/n): {Colors.ENDC}").lower() == 'n': break
